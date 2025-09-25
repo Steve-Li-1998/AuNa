@@ -14,6 +14,7 @@ WallFollow::WallFollow() : Node("wallfollowing")
     lidarscan_topic_, 10, std::bind(&WallFollow::scan_callback, this, std::placeholders::_1));
   drive_pub_ =
     this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(drive_topic_, 10);
+  error_pub_ = this->create_publisher<std_msgs::msg::Float64>("error", 10);
 
   RCLCPP_INFO(this->get_logger(), "WallFollow node initialized.");
 }
@@ -126,6 +127,9 @@ void WallFollow::pid_control(double error, double velocity)
 void WallFollow::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg)
 {
   double error = get_error(scan_msg, desired_distance_);
+  std_msgs::msg::Float64 msg;
+  msg.data = error;
+  error_pub_->publish(msg);
 
   pid_control(error, velocity_);
 }

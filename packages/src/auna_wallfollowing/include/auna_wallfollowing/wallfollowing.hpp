@@ -5,6 +5,7 @@
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
+#include "std_msgs/msg/float64.hpp"
 
 #include <cmath>
 #include <string>
@@ -40,10 +41,12 @@ private:
   // Topic names
   std::string lidarscan_topic_;
   std::string drive_topic_;
+  std::string error_topic_;
 
   // ROS2 interfaces
   rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_pub_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr error_pub_;
 
   /**
    * @brief Get range measurement at a specific angle from laser scan
