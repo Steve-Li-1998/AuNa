@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(auna_template)
+project(auna_gapfollowing)
 
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
@@ -11,24 +11,34 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # Find dependencies
-find_package(ament_cmake REQUIRED)
-find_package(ament_cmake_python REQUIRED)
+foreach(
+        PACKAGE
+        ament_cmake
+        ament_cmake_python
+        rclcpp
+        rclpy
+        geometry_msgs
+        nav_msgs
+        ackermann_msgs
+        sensor_msgs
+        std_msgs)
 
-find_package(rclcpp REQUIRED)
-find_package(rclpy REQUIRED)
+  find_package(${PACKAGE} REQUIRED)
+
+endforeach()
 
 # Include Cpp "include" directory
 include_directories(include)
 
 # Add libraries
-add_library(sample_node_lib SHARED src/sample_node/sample_node.cpp)
+add_library(sample_node_lib SHARED src/gapfollowing.cpp)
 
 # Create Cpp executable
-add_executable(sample_node src/sample_node/sample_node_main.cpp)
+add_executable(sample_node src/gapfollowing_main.cpp)
 
 # Target dependencies
-set(sample_node_dependencies rclcpp std_msgs)
-ament_target_dependencies(sample_node_lib ${gazebo_models_dependencies})
+set(sample_node_dependencies rclcpp std_msgs sensor_msgs geometry_msgs)
+ament_target_dependencies(sample_node_lib ${sample_node_dependencies})
 
 # Link libraries
 target_link_libraries(sample_node sample_node_lib)
