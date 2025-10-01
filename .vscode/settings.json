@@ -8,7 +8,7 @@
     "editor.fontSize": 16,
     "[python]": {
         "editor.defaultFormatter": "ms-python.autopep8",
-        "editor.formatOnSave": true,
+        "editor.formatOnSave": true
     },
     "[yaml]": {
         "editor.formatOnSave": false
