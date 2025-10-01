@@ -10,7 +10,6 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "std_msgs/msg/float64.hpp"
-#include <geometry_msgs/msg/detail/twist__struct.hpp>
 
 #include <cmath>
 #include <cstddef>
@@ -25,63 +24,63 @@ public:
   GapFollow();
 
 private:
-  /**
-   * @brief A lightweight view providing circular access to a std::vector.
-   *
-   * This class allows accessing elements of a vector as if it were a ring buffer
-   * (i.e., indices wrap around automatically using modulo arithmetic).
-   * It does not own the underlying data; it only provides a view.
-   *
-   * @tparam T The element type stored in the underlying vector.
-   */
-  template <typename T>
-  class RingBufferView
-  {
-  public:
-    /**
-     * @brief Constructs a ring buffer view over an existing vector.
-     * @param data Reference to the vector providing storage.
-     */
-    RingBufferView(std::vector<T> & data) : data_(data) {}
+  // /**
+  //  * @brief A lightweight view providing circular access to a std::vector.
+  //  *
+  //  * This class allows accessing elements of a vector as if it were a ring buffer
+  //  * (i.e., indices wrap around automatically using modulo arithmetic).
+  //  * It does not own the underlying data; it only provides a view.
+  //  *
+  //  * @tparam T The element type stored in the underlying vector.
+  //  */
+  // template <typename T>
+  // class RingBufferView
+  // {
+  // public:
+  //   /**
+  //    * @brief Constructs a ring buffer view over an existing vector.
+  //    * @param data Reference to the vector providing storage.
+  //    */
+  //   RingBufferView(std::vector<T> & data) : data_(data) {}
 
-    /// Default copy constructor.
-    RingBufferView(const RingBufferView & other) = default;
+  //   /// Default copy constructor.
+  //   RingBufferView(const RingBufferView & other) = default;
 
-    /**
-     * @brief Returns the number of elements in the buffer.
-     * @return Size of the underlying vector.
-     */
-    std::size_t size() const { return data_.size(); }
+  //   /**
+  //    * @brief Returns the number of elements in the buffer.
+  //    * @return Size of the underlying vector.
+  //    */
+  //   std::size_t size() const { return data_.size(); }
 
-    /**
-     * @brief Provides non-const access to an element by circular index.
-     * @param i Index (will be wrapped using modulo `size()`).
-     * @return Reference to the element at wrapped index.
-     */
-    T & operator[](long long i) { return data_[i % data_.size()]; }
+  //   /**
+  //    * @brief Provides non-const access to an element by circular index.
+  //    * @param i Index (will be wrapped using modulo `size()`).
+  //    * @return Reference to the element at wrapped index.
+  //    */
+  //   T & operator[](long long i) { return data_[i % data_.size()]; }
 
-    /**
-     * @brief Provides const access to an element by circular index.
-     * @param i Index (will be wrapped using modulo `size()`).
-     * @return Const reference to the element at wrapped index.
-     */
-    const T & operator[](long long i) const { return data_[i % data_.size()]; }
+  //   /**
+  //    * @brief Provides const access to an element by circular index.
+  //    * @param i Index (will be wrapped using modulo `size()`).
+  //    * @return Const reference to the element at wrapped index.
+  //    */
+  //   const T & operator[](long long i) const { return data_[i % data_.size()]; }
 
-    /**
-     * @brief Returns a reference to the underlying vector.
-     * @return Reference to the backing std::vector.
-     */
-    std::vector<T> & data() { return data_; }
+  //   /**
+  //    * @brief Returns a reference to the underlying vector.
+  //    * @return Reference to the backing std::vector.
+  //    */
+  //   std::vector<T> & data() { return data_; }
 
-    /**
-     * @brief Returns a const reference to the underlying vector.
-     * @return Const reference to the backing std::vector.
-     */
-    const std::vector<T> & data() const { return data_; }
+  //   /**
+  //    * @brief Returns a const reference to the underlying vector.
+  //    * @return Const reference to the backing std::vector.
+  //    */
+  //   const std::vector<T> & data() const { return data_; }
 
-  private:
-    std::vector<T> & data_;
-  };
+  // private:
+  //   std::vector<T> & data_;
+  // };
 
   // Controller parameters
   double vel_pub_rate_;
@@ -114,7 +113,7 @@ private:
 
   void timer_callback();
 
-  void preprocess_scan(GapFollow::RingBufferView<float> & ranges);
+  void preprocess_scan(sensor_msgs::msg::LaserScan & msg);
 
   /**
    * @brief Finds continuous non-zero intervals ("gaps") in a ring buffer of ranges.
@@ -135,7 +134,8 @@ private:
    * @return A vector of pairs `(start_index, end_index)` representing detected gaps.
    *         If no gaps are found, the vector will be empty.
    */
-  std::vector<std::pair<long long, long long>> find_gap(GapFollow::RingBufferView<float> & ranges);
+  std::vector<std::pair<long long, long long>> find_gap(
+    const sensor_msgs::msg::LaserScan & msg) const;
 
   /**
    * @brief Find the gap with the maximum length from a list of gaps.
@@ -150,8 +150,14 @@ private:
    *         - The interval with the maximum length if the input is not empty.
    *         - std::nullopt if the input vector is empty.
    */
-  std::optional<std::pair<long long, long long>> find_max_gap(
-    std::vector<std::pair<long long, long long>> & gaps);
+  std::optional<std::pair<long long, long long>> find_target_gap(
+    const std::vector<std::pair<long long, long long>> & gaps) const;
+
+  void stop_robot() const;
+
+  std::pair<double, double> compute_velocity(
+    const std::pair<long long, long long> & target_gap,
+    const sensor_msgs::msg::LaserScan & msg) const;
 
   /**
    * @brief Convert radians to degrees

@@ -6,10 +6,12 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <functional>
 #include <iterator>
 #include <optional>
+#include <span>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -53,34 +55,48 @@ void GapFollow::timer_callback()
   rclcpp::Time t_msg(this->scan_msg_->header.stamp);  // message release time
   rclcpp::Time t_now = this->get_clock()->now();      // current time
   auto delay = t_now - t_msg;
-  geometry_msgs::msg::Twist msg;
   if (delay > rclcpp::Duration(std::chrono::milliseconds(500))) {
-    msg.linear.x = 0;
-    msg.linear.z = 0;
-    this->vel_pub_->publish(msg);
-    RCLCPP_ERROR_STREAM(this->get_logger(), "The scan data is too old, robot will stop.");
+    this->stop_robot();
+    RCLCPP_ERROR(this->get_logger(), "The scan data is too old, robot will stop.");
   } else if (this->last_scan_time_ == t_msg) {
     return;
   } else {
     this->last_scan_time_ = t_msg;
-    auto ranges = RingBufferView<float>{this->scan_msg_->ranges};
-    this->preprocess_scan(ranges);
+    auto & ranges = this->scan_msg_->ranges;
+    if (this->scan_msg_) {
+      this->preprocess_scan(*(this->scan_msg_));
+      auto target_gap = this->find_target_gap(this->find_gap(*(this->scan_msg_)));
+      if (target_gap.has_value()) {
+        auto [linear_x, angular_z] = this->compute_velocity(target_gap.value(), *(this->scan_msg_));
+
+      } else {
+        this->stop_robot();
+        RCLCPP_ERROR(this->get_logger(), "No avaliable destination.");
+      }
+    } else {
+      this->stop_robot();
+      RCLCPP_WARN_STREAM(
+        this->get_logger(),
+        "There is still no message from topic \"" << this->scan_topic_ << "\" cached.");
+    }
   }
 }
 
-void GapFollow::preprocess_scan(GapFollow::RingBufferView<float> & ranges)
+void GapFollow::preprocess_scan(sensor_msgs::msg::LaserScan & msg)
 {
+  auto & ranges = msg.ranges;
   const unsigned int bubble_width = static_cast<unsigned int>(ranges.size() * 0.03);
-  auto it = std::min_element(ranges.data().begin(), ranges.data().end());
-  long long min_index = std::distance(ranges.data().begin(), it);
+  auto it = std::min_element(ranges.begin(), ranges.end());
+  long long min_index = std::distance(ranges.begin(), it);
   for (int i = min_index - bubble_width; i <= static_cast<int>(min_index + bubble_width); ++i) {
     ranges[i] = 0.0;
   }
 }
 
 std::vector<std::pair<long long, long long>> GapFollow::find_gap(
-  GapFollow::RingBufferView<float> & ranges)
+  const sensor_msgs::msg::LaserScan & msg) const
 {
+  const auto & ranges = msg.ranges;
   std::vector<std::pair<long long, long long>> gaps;
   gaps.reserve(10);
   auto in_gap = false;
@@ -97,26 +113,49 @@ std::vector<std::pair<long long, long long>> GapFollow::find_gap(
 
   // Case the last gap not closed
   if (in_gap) {
-    if (gaps.size() == 1) {
-      gaps.back().second = static_cast<long long>(ranges.size()) - 1;
-    } else {
-      gaps.front().first = gaps.back().first - ranges.size();
-      gaps.pop_back();
-    }
+    gaps.back().second = static_cast<long long>(ranges.size()) - 1;
   }
   return gaps;
 }
 
-// TODO What if the biggest gap in the back direction of the car?
-std::optional<std::pair<long long, long long>> GapFollow::find_max_gap(
-  std::vector<std::pair<long long, long long>> & gaps)
+std::optional<std::pair<long long, long long>> GapFollow::find_target_gap(
+  const std::vector<std::pair<long long, long long>> & gaps) const
 {
   if (gaps.empty()) {
     return std::nullopt;
   }
 
+  // gaps.erase(
+  //   std::remove_if(
+  //     gaps.begin(), gaps.end(),
+  //     [&msg](const auto & item) {
+  //       return (
+  //         item.second * msg.angle_increment + msg.angle_min < -M_PI / 2.0 ||
+  //         item.first * msg.angle_increment + msg.angle_min > M_PI / 2.0);
+  //     }),
+  //   gaps.end());
+
   auto target = std::max_element(gaps.begin(), gaps.end(), [](const auto & a, const auto & b) {
     return (a.second - a.first) < (b.second - b.first);
   });
   return *target;
+}
+
+void GapFollow::stop_robot() const
+{
+  geometry_msgs::msg::Twist msg;
+  msg.linear.x = 0;
+  msg.linear.z = 0;
+  this->vel_pub_->publish(msg);
+}
+
+std::pair<double, double> GapFollow::compute_velocity(
+  const std::pair<long long, long long> & target_gap, const sensor_msgs::msg::LaserScan & msg) const
+{
+  const auto & ranges = msg.ranges;
+  std::span<const float> gap_content(
+    ranges.begin() + target_gap.first, ranges.begin() + target_gap.second + 1);
+  auto max_range = std::max_element(gap_content.begin(), gap_content.end());
+  // TODO compute the velocity command by give point
+  return {2.0, 1.0};
 }
