@@ -1,6 +1,6 @@
 CompileFlags:
   Add:
-    - "-std=c++17"
+    # - "-std=c++17"
     - "-I/opt/ros/humble/include"
     - "-I/opt/ros/humble/include/rclcpp"
     - "-I/home/ubuntu/workspace/packages/install/include"
