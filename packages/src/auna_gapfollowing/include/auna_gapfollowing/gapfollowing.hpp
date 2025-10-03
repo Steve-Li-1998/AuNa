@@ -57,14 +57,14 @@ private:
   //    * @param i Index (will be wrapped using modulo `size()`).
   //    * @return Reference to the element at wrapped index.
   //    */
-  //   T & operator[](long long i) { return data_[i % data_.size()]; }
+  //   T & operator[](size_t i) { return data_[i % data_.size()]; }
 
   //   /**
   //    * @brief Provides const access to an element by circular index.
   //    * @param i Index (will be wrapped using modulo `size()`).
   //    * @return Const reference to the element at wrapped index.
   //    */
-  //   const T & operator[](long long i) const { return data_[i % data_.size()]; }
+  //   const T & operator[](size_t i) const { return data_[i % data_.size()]; }
 
   //   /**
   //    * @brief Returns a reference to the underlying vector.
@@ -134,30 +134,29 @@ private:
    * @return A vector of pairs `(start_index, end_index)` representing detected gaps.
    *         If no gaps are found, the vector will be empty.
    */
-  std::vector<std::pair<long long, long long>> find_gap(
-    const sensor_msgs::msg::LaserScan & msg) const;
+  std::vector<std::pair<size_t, size_t>> find_gap(const sensor_msgs::msg::LaserScan & msg) const;
 
   /**
    * @brief Find the gap with the maximum length from a list of gaps.
    *
    * This function inspects a vector of intervals, where each interval is represented
-   * as a pair of two long long values (start, end). It computes the gap length as
+   * as a pair of two size_t values (start, end). It computes the gap length as
    * `(second - first)` for each pair and returns the interval with the maximum length.
    *
    * @param gaps Reference to a vector of gap intervals (start, end).
    *
-   * @return std::optional<std::pair<long long, long long>>
+   * @return std::optional<std::pair<size_t, size_t>>
    *         - The interval with the maximum length if the input is not empty.
    *         - std::nullopt if the input vector is empty.
    */
-  std::optional<std::pair<long long, long long>> find_target_gap(
-    const std::vector<std::pair<long long, long long>> & gaps) const;
+  std::optional<std::pair<size_t, size_t>> find_target_gap(
+    const std::vector<std::pair<size_t, size_t>> & gaps) const;
 
   void stop_robot() const;
+  void send_vel_cmd(double linear_x, double angular_z) const;
 
   std::pair<double, double> compute_velocity(
-    const std::pair<long long, long long> & target_gap,
-    const sensor_msgs::msg::LaserScan & msg) const;
+    const std::pair<size_t, size_t> & target_gap, const sensor_msgs::msg::LaserScan & msg) const;
 
   /**
    * @brief Convert radians to degrees

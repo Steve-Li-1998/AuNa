@@ -30,18 +30,19 @@ endforeach()
 # Include Cpp "include" directory
 include_directories(include)
 
+# Target dependencies
+set(sample_node_dependencies rclcpp std_msgs sensor_msgs geometry_msgs)
+
 # Add libraries
-add_library(sample_node_lib SHARED src/gapfollowing.cpp)
+add_library(${PROJECT_NAME}_lib SHARED src/gapfollowing.cpp)
+target_include_directories(${PROJECT_NAME}_lib PUBLIC include)
+ament_target_dependencies(${PROJECT_NAME}_lib ${sample_node_dependencies})
 
 # Create Cpp executable
 add_executable(sample_node src/gapfollowing_main.cpp)
 
-# Target dependencies
-set(sample_node_dependencies rclcpp std_msgs sensor_msgs geometry_msgs)
-ament_target_dependencies(sample_node_lib ${sample_node_dependencies})
-
 # Link libraries
-target_link_libraries(sample_node sample_node_lib)
+target_link_libraries(sample_node ${PROJECT_NAME}_lib)
 
 install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
 
@@ -49,7 +50,7 @@ install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
 install(TARGETS sample_node DESTINATION lib/${PROJECT_NAME})
 
 install(
-  TARGETS sample_node_lib
+  TARGETS ${PROJECT_NAME}_lib
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)

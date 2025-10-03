@@ -12,6 +12,9 @@ cmd_vel_multiplexer_node:
     - type: "Twist"
       name: "nav2"
       topic: "cmd_vel/nav2"
+    - type: "Twist"
+      name: "gap"
+      topic: "cmd_vel/gap"
   outputs:
     - type: "Twist"
       name: "twist"
