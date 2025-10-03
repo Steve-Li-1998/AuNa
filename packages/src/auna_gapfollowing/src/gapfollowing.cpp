@@ -67,10 +67,6 @@ void GapFollow::timer_callback()
   }
   rclcpp::Time t_msg(this->scan_msg_->header.stamp);  // message release time
   rclcpp::Time t_now = this->get_clock()->now();      // current time
-  std::cout << t_msg.seconds() << std::endl;
-  std::cout << t_msg.get_clock_type() << std::endl;
-  std::cout << t_now.seconds() << std::endl;
-  std::cout << t_now.get_clock_type() << std::endl;
   if (t_now.seconds() == 0.0) {
     RCLCPP_WARN(this->get_logger(), "ROS time not initialized yet");
     return;
