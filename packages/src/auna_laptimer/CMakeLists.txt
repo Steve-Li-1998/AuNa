@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(auna_gapfollowing)
+project(auna_laptimer)
 
 # Default to C++14
 # if(NOT CMAKE_CXX_STANDARD)
@@ -21,6 +21,7 @@ foreach(
         nav_msgs
         ackermann_msgs
         sensor_msgs
+        auna_laptimer_interfaces
         std_msgs)
 
   find_package(${PACKAGE} REQUIRED)
@@ -31,23 +32,23 @@ endforeach()
 include_directories(include)
 
 # Target dependencies
-set(sample_node_dependencies rclcpp std_msgs sensor_msgs geometry_msgs)
+set(laptimer_dependencies rclcpp std_msgs sensor_msgs geometry_msgs auna_laptimer_interfaces)
 
 # Add libraries
-add_library(${PROJECT_NAME}_lib SHARED src/gapfollowing.cpp)
+add_library(${PROJECT_NAME}_lib SHARED src/laptimer.cpp)
 target_include_directories(${PROJECT_NAME}_lib PUBLIC include)
-ament_target_dependencies(${PROJECT_NAME}_lib ${sample_node_dependencies})
+ament_target_dependencies(${PROJECT_NAME}_lib ${laptimer_dependencies})
 
 # Create Cpp executable
-add_executable(sample_node src/gapfollowing_main.cpp)
+add_executable(laptimer src/laptimer_main.cpp)
 
 # Link libraries
-target_link_libraries(sample_node ${PROJECT_NAME}_lib)
+target_link_libraries(laptimer ${PROJECT_NAME}_lib)
 
 install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
 
 # Install Cpp executables
-install(TARGETS sample_node DESTINATION lib/${PROJECT_NAME})
+install(TARGETS laptimer DESTINATION lib/${PROJECT_NAME})
 
 install(
   TARGETS ${PROJECT_NAME}_lib

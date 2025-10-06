@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>auna_gapfollowing</name>
+  <name>auna_laptimer</name>
   <version>1.0.0</version>
   <description>AuNa Template Package</description>
   <maintainer email="hao3.li@tu-dortmund.de">Hao Li</maintainer>
@@ -16,6 +16,7 @@
   <depend>sensor_msgs</depend>
   <depend>ackermann_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>auna_laptimer_interfaces</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
