@@ -39,15 +39,15 @@ target_include_directories(${PROJECT_NAME}_lib PUBLIC include)
 ament_target_dependencies(${PROJECT_NAME}_lib ${sample_node_dependencies})
 
 # Create Cpp executable
-add_executable(sample_node src/gapfollowing_main.cpp)
+add_executable(gapfollowing src/gapfollowing_main.cpp)
 
 # Link libraries
-target_link_libraries(sample_node ${PROJECT_NAME}_lib)
+target_link_libraries(gapfollowing ${PROJECT_NAME}_lib)
 
 install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
 
 # Install Cpp executables
-install(TARGETS sample_node DESTINATION lib/${PROJECT_NAME})
+install(TARGETS gapfollowing DESTINATION lib/${PROJECT_NAME})
 
 install(
   TARGETS ${PROJECT_NAME}_lib

@@ -85,6 +85,12 @@ private:
   // Controller parameters
   double vel_pub_rate_;
   std::chrono::milliseconds period_;
+  constexpr static double SAFE_DISTANCE_ = 0.5;
+  double bubble_radius_ratio_;
+  double linear_velocity_factor_;
+  double angular_velocity_factor_;
+  double max_linear_velocity_;
+  double max_angular_velocity_;
   // double desired_distance_;
   // double velocity_;
   // double max_steering_angle_;
@@ -158,12 +164,7 @@ private:
   std::pair<double, double> compute_velocity(
     const std::pair<size_t, size_t> & target_gap, const sensor_msgs::msg::LaserScan & msg) const;
 
-  /**
-   * @brief Convert radians to degrees
-   * @param angleInRadians Angle in radians
-   * @return Angle in degrees
-   */
-  double radiansToDegree(const double & angleInRadians);
+  std::pair<double, double> scaleToLimits(double linear, double angular) const;
 
   /**
    * @brief Declare and get parameters from parameter server

@@ -8,6 +8,7 @@
 #include <rcl/time.h>
 
 #include <algorithm>
+#include <cassert>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -24,6 +25,7 @@ GapFollow::GapFollow()
 : rclcpp::Node("gap_following", rclcpp::NodeOptions().use_clock_thread(true)), scan_msg_(nullptr)
 {
   this->declare_parameters();
+  std::cout << this->get_name() << std::endl;
 
   this->period_ = std::chrono::milliseconds(static_cast<int>(1000.0 / vel_pub_rate_));
   this->last_scan_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
@@ -42,12 +44,35 @@ void GapFollow::declare_parameters()
 
   // Get topic names
   this->scan_topic_ = this->get_parameter("scan_topic").as_string();
+  RCLCPP_INFO(this->get_logger(), "Subscribing to scan topic: %s", this->scan_topic_.c_str());
   this->vel_topic_ = this->get_parameter("vel_topic").as_string();
+  RCLCPP_INFO(this->get_logger(), "Publishing velocity to topic: %s", this->vel_topic_.c_str());
 
-  // Declare parameter names
+  // Declare controller parameters
+  this->declare_parameter("linear_velocity_factor", 1.0);
+  this->declare_parameter("angular_velocity_factor", 1.0);
+  this->declare_parameter("max_linear_velocity", 10.5);
+  this->declare_parameter("max_angular_velocity", 10.0);
+  this->declare_parameter("bubble_radius_ratio", 0.2);
+
+  // Get controller parameters
+  this->bubble_radius_ratio_ = this->get_parameter("bubble_radius_ratio").as_double();
+  RCLCPP_INFO(this->get_logger(), "Bubble radius ratio set to: %.3f", this->bubble_radius_ratio_);
+  this->linear_velocity_factor_ = this->get_parameter("linear_velocity_factor").as_double();
+  RCLCPP_INFO(
+    this->get_logger(), "Linear velocity factor set to: %.3f", this->linear_velocity_factor_);
+  this->angular_velocity_factor_ = this->get_parameter("angular_velocity_factor").as_double();
+  RCLCPP_INFO(
+    this->get_logger(), "Angular velocity factor set to: %.3f", this->angular_velocity_factor_);
+  this->max_linear_velocity_ = this->get_parameter("max_linear_velocity").as_double();
+  RCLCPP_INFO(this->get_logger(), "Max linear velocity set to: %.3f", this->max_linear_velocity_);
+  this->max_angular_velocity_ = this->get_parameter("max_angular_velocity").as_double();
+  RCLCPP_INFO(this->get_logger(), "Max angular velocity set to: %.3f", this->max_angular_velocity_);
+
+  // Declare velocity publish rate
   this->declare_parameter("vel_pub_rate", 50.0);
 
-  // Get parameter names
+  // Get velocity publish rate
   this->vel_pub_rate_ = this->get_parameter("vel_pub_rate").as_double();
 }
 
@@ -94,12 +119,31 @@ void GapFollow::timer_callback()
 
 void GapFollow::preprocess_scan(sensor_msgs::msg::LaserScan & msg)
 {
+  // confim bubble width
   auto & ranges = msg.ranges;
-  const unsigned int bubble_width = static_cast<unsigned int>(ranges.size() * 0.03);
-  auto it = std::min_element(ranges.begin(), ranges.end());
-  size_t min_index = std::distance(ranges.begin(), it);
-  for (int i = min_index - bubble_width; i <= static_cast<int>(min_index + bubble_width); ++i) {
-    ranges[i] = 0.0;
+  const auto ranges_copy = ranges;
+  const size_t bubble_radius = static_cast<size_t>(ranges.size() * this->bubble_radius_ratio_);
+
+  // Replace  inf values with max range
+  std::replace_if(
+    ranges.begin(), ranges.end(), [](float r) { return std::isinf(r); }, msg.range_max);
+
+  // Zero out values within the "bubble" around the danger points
+  for (size_t i = 0; i < ranges.size(); ++i) {
+    const auto & range = ranges_copy[i];
+    if (range < this->SAFE_DISTANCE_) {
+      size_t start_index, end_index;
+      if (bubble_radius > i) {
+        start_index = 0;
+      } else {
+        start_index = i - bubble_radius;
+      }
+      end_index = std::min(i + bubble_radius + 1, ranges.size());
+
+      for (size_t j = start_index; j < end_index; ++j) {
+        ranges[j] = 0.0;
+      }
+    }
   }
 }
 
@@ -160,12 +204,36 @@ std::pair<double, double> GapFollow::compute_velocity(
     ranges.begin() + target_gap.first, ranges.begin() + target_gap.second + 1);
   auto max_range_it = std::max_element(gap_content.begin(), gap_content.end());
 
-  // compute angle of destination
+  // compute the angle and distance to the furthest point
   auto max_range_index = std::distance(ranges.data(), &*max_range_it);
   auto destination_angle = msg.angle_min + msg.angle_increment * max_range_index;
-  // get linear of destination
   auto destination_linear = msg.ranges[max_range_index];
 
-  // TODO compute the velocity command by give point
-  return {destination_linear, destination_angle};
+  // scale the velocity by factors
+  return this->scaleToLimits(
+    this->linear_velocity_factor_ * destination_linear,
+    this->angular_velocity_factor_ * destination_angle);
+}
+
+std::pair<double, double> GapFollow::scaleToLimits(double linear, double angular) const
+{
+  // Check for NaN values in the input velocities
+  if (std::isnan(linear) || std::isnan(angular)) {
+    RCLCPP_ERROR(
+      this->get_logger(), "NaN detected in velocity! linear=%.3f angular=%.3f", linear, angular);
+    return {0.0, 0.0};
+  }
+
+  // Compute the ratios of the absolute velocities to their respective limits
+  double ratio_linear = std::abs(linear) / this->max_linear_velocity_;
+  double ratio_angular = std::abs(angular) / this->max_angular_velocity_;
+  double scale = std::max(ratio_linear, ratio_angular);
+
+  // If either velocity exceeds its limit, scale both down proportionally
+  if (scale > 1.0) {
+    linear /= scale;
+    angular /= scale;
+  }
+
+  return {linear, angular};
 }

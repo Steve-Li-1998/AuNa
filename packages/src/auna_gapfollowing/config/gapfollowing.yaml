@@ -1,0 +1,16 @@
+robot1:
+  gapfollowing_node:
+    ros__parameters:
+      # Use simulation time
+      use_sim_time: true
+
+      # Controller parameters
+      linear_velocity_factor: 1.0
+      angular_velocity_factor: 0.2
+      max_linear_velocity: 2.0
+      max_angular_velocity: 10.0
+      bubble_radius_ratio: 0.15  # Bubble radius as a ratio of total scan size
+
+      # Topic names
+      scan_topic: "scan"
+      vel_topic: "cmd_vel/gap"
