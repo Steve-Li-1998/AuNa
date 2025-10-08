@@ -58,15 +58,19 @@ void GapFollow::declare_parameters()
   // Get controller parameters
   this->bubble_radius_ratio_ = this->get_parameter("bubble_radius_ratio").as_double();
   RCLCPP_INFO(this->get_logger(), "Bubble radius ratio set to: %.3f", this->bubble_radius_ratio_);
-  this->linear_velocity_factor_ = this->get_parameter("linear_velocity_factor").as_double();
+  this->linear_velocity_factor_ =
+    static_cast<float>(this->get_parameter("linear_velocity_factor").as_double());
   RCLCPP_INFO(
     this->get_logger(), "Linear velocity factor set to: %.3f", this->linear_velocity_factor_);
-  this->angular_velocity_factor_ = this->get_parameter("angular_velocity_factor").as_double();
+  this->angular_velocity_factor_ =
+    static_cast<float>(this->get_parameter("angular_velocity_factor").as_double());
   RCLCPP_INFO(
     this->get_logger(), "Angular velocity factor set to: %.3f", this->angular_velocity_factor_);
-  this->max_linear_velocity_ = this->get_parameter("max_linear_velocity").as_double();
+  this->max_linear_velocity_ =
+    static_cast<float>(this->get_parameter("max_linear_velocity").as_double());
   RCLCPP_INFO(this->get_logger(), "Max linear velocity set to: %.3f", this->max_linear_velocity_);
-  this->max_angular_velocity_ = this->get_parameter("max_angular_velocity").as_double();
+  this->max_angular_velocity_ =
+    static_cast<float>(this->get_parameter("max_angular_velocity").as_double());
   RCLCPP_INFO(this->get_logger(), "Max angular velocity set to: %.3f", this->max_angular_velocity_);
 
   // Declare velocity publish rate
@@ -74,6 +78,7 @@ void GapFollow::declare_parameters()
 
   // Get velocity publish rate
   this->vel_pub_rate_ = this->get_parameter("vel_pub_rate").as_double();
+  RCLCPP_INFO(this->get_logger(), "Velocity publish rate set to: %.3f Hz", this->vel_pub_rate_);
 }
 
 void GapFollow::scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr scan_msg)
@@ -187,7 +192,7 @@ std::optional<std::pair<size_t, size_t>> GapFollow::find_target_gap(
 
 void GapFollow::stop_robot() const { this->send_vel_cmd(0.0, 0.0); }
 
-void GapFollow::send_vel_cmd(double linear_x, double angular_z) const
+void GapFollow::send_vel_cmd(float linear_x, float angular_z) const
 {
   geometry_msgs::msg::Twist msg;
   msg.linear.x = linear_x;
@@ -195,7 +200,7 @@ void GapFollow::send_vel_cmd(double linear_x, double angular_z) const
   this->vel_pub_->publish(msg);
 }
 
-std::pair<double, double> GapFollow::compute_velocity(
+std::pair<float, float> GapFollow::compute_velocity(
   const std::pair<size_t, size_t> & target_gap, const sensor_msgs::msg::LaserScan & msg) const
 {
   // find the furthest point in the scan
@@ -206,16 +211,21 @@ std::pair<double, double> GapFollow::compute_velocity(
 
   // compute the angle and distance to the furthest point
   auto max_range_index = std::distance(ranges.data(), &*max_range_it);
-  auto destination_angle = msg.angle_min + msg.angle_increment * max_range_index;
+  auto destination_angular = msg.angle_min + msg.angle_increment * max_range_index;
   auto destination_linear = msg.ranges[max_range_index];
 
+  this->scaleToLimits(
+    destination_linear = destination_linear * this->linear_velocity_factor_,
+    destination_angular = destination_angular * this->angular_velocity_factor_);
+
+  // Dampen linear velocity based on angular velocity
+  destination_linear *= std::exp(-std::pow(destination_angular / this->max_angular_velocity_, 2));
+
   // scale the velocity by factors
-  return this->scaleToLimits(
-    this->linear_velocity_factor_ * destination_linear,
-    this->angular_velocity_factor_ * destination_angle);
+  return {destination_linear, destination_angular};
 }
 
-std::pair<double, double> GapFollow::scaleToLimits(double linear, double angular) const
+std::pair<float, float> GapFollow::scaleToLimits(float & linear, float & angular) const
 {
   // Check for NaN values in the input velocities
   if (std::isnan(linear) || std::isnan(angular)) {
@@ -224,16 +234,8 @@ std::pair<double, double> GapFollow::scaleToLimits(double linear, double angular
     return {0.0, 0.0};
   }
 
-  // Compute the ratios of the absolute velocities to their respective limits
-  double ratio_linear = std::abs(linear) / this->max_linear_velocity_;
-  double ratio_angular = std::abs(angular) / this->max_angular_velocity_;
-  double scale = std::max(ratio_linear, ratio_angular);
-
-  // If either velocity exceeds its limit, scale both down proportionally
-  if (scale > 1.0) {
-    linear /= scale;
-    angular /= scale;
-  }
+  linear = std::clamp(linear, -this->max_linear_velocity_, this->max_linear_velocity_);
+  angular = std::clamp(angular, -this->max_angular_velocity_, this->max_angular_velocity_);
 
   return {linear, angular};
 }

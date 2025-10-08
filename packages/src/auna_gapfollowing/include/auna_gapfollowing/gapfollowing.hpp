@@ -87,10 +87,10 @@ private:
   std::chrono::milliseconds period_;
   constexpr static double SAFE_DISTANCE_ = 0.5;
   double bubble_radius_ratio_;
-  double linear_velocity_factor_;
-  double angular_velocity_factor_;
-  double max_linear_velocity_;
-  double max_angular_velocity_;
+  float linear_velocity_factor_;
+  float angular_velocity_factor_;
+  float max_linear_velocity_;
+  float max_angular_velocity_;
   // double desired_distance_;
   // double velocity_;
   // double max_steering_angle_;
@@ -159,12 +159,12 @@ private:
     const std::vector<std::pair<size_t, size_t>> & gaps) const;
 
   void stop_robot() const;
-  void send_vel_cmd(double linear_x, double angular_z) const;
+  void send_vel_cmd(float linear_x, float angular_z) const;
 
-  std::pair<double, double> compute_velocity(
+  std::pair<float, float> compute_velocity(
     const std::pair<size_t, size_t> & target_gap, const sensor_msgs::msg::LaserScan & msg) const;
 
-  std::pair<double, double> scaleToLimits(double linear, double angular) const;
+  std::pair<float, float> scaleToLimits(float & linear, float & angular) const;
 
   /**
    * @brief Declare and get parameters from parameter server

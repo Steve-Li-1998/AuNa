@@ -6,10 +6,11 @@ robot1:
 
       # Controller parameters
       linear_velocity_factor: 1.0
-      angular_velocity_factor: 0.2
+      angular_velocity_factor: 0.25
       max_linear_velocity: 2.0
       max_angular_velocity: 10.0
       bubble_radius_ratio: 0.15  # Bubble radius as a ratio of total scan size
+      vel_pub_rate: 20.0  # Velocity publish rate in Hz
 
       # Topic names
       scan_topic: "scan"
