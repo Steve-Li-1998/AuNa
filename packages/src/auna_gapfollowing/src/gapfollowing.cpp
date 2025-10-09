@@ -104,11 +104,14 @@ void GapFollow::timer_callback()
   auto delay = t_now - t_msg;
 
   if (delay > rclcpp::Duration(std::chrono::milliseconds(500))) {
+    // If the scan data is too old, stop the robot
     this->stop_robot();
     RCLCPP_ERROR(this->get_logger(), "The scan data is too old, robot will stop.");
   } else if (this->last_scan_time_ == t_msg) {
+    // If the scan data is the same as last time, do nothing
     return;
   } else {
+    // Process the new scan data
     this->last_scan_time_ = t_msg;
     this->preprocess_scan(*(this->scan_msg_));
     auto target_gap = this->find_target_gap(this->find_gap(*(this->scan_msg_)));
@@ -180,10 +183,12 @@ std::vector<std::pair<size_t, size_t>> GapFollow::find_gap(
 std::optional<std::pair<size_t, size_t>> GapFollow::find_target_gap(
   const std::vector<std::pair<size_t, size_t>> & gaps) const
 {
+  // If no gaps found, return nullopt
   if (gaps.empty()) {
     return std::nullopt;
   }
 
+  // Find the gap with the maximum width
   auto target = std::max_element(gaps.begin(), gaps.end(), [](const auto & a, const auto & b) {
     return (a.second - a.first) < (b.second - b.first);
   });

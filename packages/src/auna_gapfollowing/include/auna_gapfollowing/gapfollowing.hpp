@@ -5,8 +5,7 @@
 
 #include <rclcpp/experimental/buffers/ring_buffer_implementation.hpp>
 #include <rclcpp/parameter.hpp>
-// #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
-// #include "nav_msgs/msg/odometry.hpp"
+
 #include "geometry_msgs/msg/twist.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "std_msgs/msg/float64.hpp"
@@ -24,64 +23,6 @@ public:
   GapFollow();
 
 private:
-  // /**
-  //  * @brief A lightweight view providing circular access to a std::vector.
-  //  *
-  //  * This class allows accessing elements of a vector as if it were a ring buffer
-  //  * (i.e., indices wrap around automatically using modulo arithmetic).
-  //  * It does not own the underlying data; it only provides a view.
-  //  *
-  //  * @tparam T The element type stored in the underlying vector.
-  //  */
-  // template <typename T>
-  // class RingBufferView
-  // {
-  // public:
-  //   /**
-  //    * @brief Constructs a ring buffer view over an existing vector.
-  //    * @param data Reference to the vector providing storage.
-  //    */
-  //   RingBufferView(std::vector<T> & data) : data_(data) {}
-
-  //   /// Default copy constructor.
-  //   RingBufferView(const RingBufferView & other) = default;
-
-  //   /**
-  //    * @brief Returns the number of elements in the buffer.
-  //    * @return Size of the underlying vector.
-  //    */
-  //   std::size_t size() const { return data_.size(); }
-
-  //   /**
-  //    * @brief Provides non-const access to an element by circular index.
-  //    * @param i Index (will be wrapped using modulo `size()`).
-  //    * @return Reference to the element at wrapped index.
-  //    */
-  //   T & operator[](size_t i) { return data_[i % data_.size()]; }
-
-  //   /**
-  //    * @brief Provides const access to an element by circular index.
-  //    * @param i Index (will be wrapped using modulo `size()`).
-  //    * @return Const reference to the element at wrapped index.
-  //    */
-  //   const T & operator[](size_t i) const { return data_[i % data_.size()]; }
-
-  //   /**
-  //    * @brief Returns a reference to the underlying vector.
-  //    * @return Reference to the backing std::vector.
-  //    */
-  //   std::vector<T> & data() { return data_; }
-
-  //   /**
-  //    * @brief Returns a const reference to the underlying vector.
-  //    * @return Const reference to the backing std::vector.
-  //    */
-  //   const std::vector<T> & data() const { return data_; }
-
-  // private:
-  //   std::vector<T> & data_;
-  // };
-
   // Controller parameters
   double vel_pub_rate_;
   std::chrono::milliseconds period_;
@@ -91,12 +32,6 @@ private:
   float angular_velocity_factor_;
   float max_linear_velocity_;
   float max_angular_velocity_;
-  // double desired_distance_;
-  // double velocity_;
-  // double max_steering_angle_;
-  // double min_velocity_;
-  // double max_velocity_;
-  // double error_threshold_;
 
   sensor_msgs::msg::LaserScan::SharedPtr scan_msg_;
   rclcpp::Time last_scan_time_;
@@ -106,7 +41,6 @@ private:
   std::string vel_topic_;
 
   // ROS2 interfaces
-  // rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr vel_pub_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
@@ -117,53 +51,113 @@ private:
    */
   void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr scan_msg);
 
+  /**
+   * @brief Timer callback to publish velocity commands at a fixed rate
+   */
   void timer_callback();
+
+  /**
+   * @brief Preprocess the LaserScan data to remove unsafe and invalid readings.
+   *
+   * This function performs two key preprocessing steps:
+   *  1. Replaces all infinite range readings (inf) with the sensor's maximum range value.
+   *  2. Creates a "safety bubble" around detected obstacles by setting nearby range values
+   *     to zero. This prevents the robot from attempting to navigate too close to obstacles.
+   *
+   * The bubble width is determined by `bubble_radius_ratio_`, which specifies the proportion
+   * of scan points to include around each obstacle.
+   *
+   * @param msg LaserScan message containing the range data to preprocess. The ranges will be
+   * modified in place.
+   */
 
   void preprocess_scan(sensor_msgs::msg::LaserScan & msg);
 
   /**
-   * @brief Finds continuous non-zero intervals ("gaps") in a ring buffer of ranges.
+   * @brief Identify continuous gaps from LaserScan data.
    *
-   * This function scans through a circular buffer of floating-point range values
-   * and identifies all continuous segments where the values are non-zero.
-   * Each segment is represented as a pair of indices `(start, end)` marking
-   * the inclusive range of the gap.
+   * This function scans through the laser range readings and identifies
+   * contiguous sequences of valid (non-zero) measurements. Each continuous
+   * segment is considered a navigable gap, defined by its start and end indices.
+   * If a gap continues until the end of the scan, it is properly closed.
    *
-   * A gap:
-   * - Starts when a transition from `0.0` to a non-zero value occurs.
-   * - Ends when a transition from a non-zero value back to `0.0` occurs.
+   * @param msg LaserScan message containing distance readings.
    *
-   * @param ranges A ring buffer view of floating-point values.
-   *               - `0.0` indicates an empty measurement.
-   *               - Non-zero indicates a valid measurement.
-   *
-   * @return A vector of pairs `(start_index, end_index)` representing detected gaps.
-   *         If no gaps are found, the vector will be empty.
+   * @return std::vector<std::pair<size_t, size_t>>
+   *         - A list of gaps, where each pair represents the start and end indices.
    */
   std::vector<std::pair<size_t, size_t>> find_gap(const sensor_msgs::msg::LaserScan & msg) const;
 
   /**
-   * @brief Find the gap with the maximum length from a list of gaps.
+   * @brief Find the widest gap from a list of detected gaps.
    *
-   * This function inspects a vector of intervals, where each interval is represented
-   * as a pair of two size_t values (start, end). It computes the gap length as
-   * `(second - first)` for each pair and returns the interval with the maximum length.
+   * This function iterates through a list of gaps, each represented by
+   * a pair of start and end indices, and selects the one with the largest
+   * width (difference between end and start). If no gaps are available,
+   * an empty optional is returned.
    *
-   * @param gaps Reference to a vector of gap intervals (start, end).
+   * @param gaps A vector of pairs, where each pair represents the start
+   *             and end indices of a detected gap.
    *
    * @return std::optional<std::pair<size_t, size_t>>
-   *         - The interval with the maximum length if the input is not empty.
-   *         - std::nullopt if the input vector is empty.
+   *         - The start and end indices of the widest gap.
+   *         - Returns std::nullopt if the list is empty.
    */
   std::optional<std::pair<size_t, size_t>> find_target_gap(
     const std::vector<std::pair<size_t, size_t>> & gaps) const;
 
+  /**
+   * @brief Stop the robot by sending zero velocity commands.
+   *
+   * This function halts the robot by publishing a Twist message
+   * with both linear and angular velocities set to zero.
+   */
   void stop_robot() const;
+
+  /**
+   * @brief Publish a velocity command to the robot.
+   *
+   * This function creates and publishes a geometry_msgs::msg::Twist message
+   * to control the robot's linear and angular velocities.
+   *
+   * @param linear_x  Linear velocity along the x-axis (m/s).
+   * @param angular_z Angular velocity around the z-axis (rad/s).
+   */
   void send_vel_cmd(float linear_x, float angular_z) const;
 
+  /**
+   * @brief Compute the desired linear and angular velocity based on the target gap.
+   *
+   * This function identifies the furthest point within the selected gap region of the
+   * LaserScan data and computes corresponding linear and angular velocities for the robot
+   * to navigate toward that point. The linear velocity is scaled by distance and reduced
+   * for sharp turns using a Gaussian damping function.
+   *
+   * @param target_gap A pair of indices representing the start and end of the selected gap.
+   * @param msg The LaserScan message containing range and angular information.
+   *
+   * @return std::pair<float, float>
+   *         - The first value is the computed linear velocity (m/s).
+   *         - The second value is the computed angular velocity (rad/s).
+   */
   std::pair<float, float> compute_velocity(
     const std::pair<size_t, size_t> & target_gap, const sensor_msgs::msg::LaserScan & msg) const;
 
+  /**
+   * @brief Clamp linear and angular velocities to safe operational limits.
+   *
+   * This function ensures that both linear and angular velocity commands
+   * are within the predefined maximum bounds. It also checks for invalid
+   * (NaN) input values and logs an error if detected, returning zero velocities
+   * in that case to prevent unsafe behavior.
+   *
+   * @param linear  Reference to the desired linear velocity (m/s).
+   * @param angular Reference to the desired angular velocity (rad/s).
+   *
+   * @return std::pair<float, float>
+   *         - The clamped (linear, angular) velocity pair.
+   *         - Returns {0.0, 0.0} if NaN values are detected.
+   */
   std::pair<float, float> scaleToLimits(float & linear, float & angular) const;
 
   /**
