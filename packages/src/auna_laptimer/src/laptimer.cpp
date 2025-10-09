@@ -117,16 +117,20 @@ void LapTimer::get_lap_records_callback(
 void LapTimer::ground_truth_callback(
   const geometry_msgs::msg::PoseStamped::ConstSharedPtr ground_truth_msg)
 {
+  // First message, just store the position
   if (this->last_ground_truth_position_ == std::nullopt) {
     this->last_ground_truth_position_.emplace(
       ground_truth_msg->pose.position.x, ground_truth_msg->pose.position.y);
     return;
   }
+  // Subsequent messages, create a line segment from last to current position
   Eigen::Vector2d current_position(
     ground_truth_msg->pose.position.x, ground_truth_msg->pose.position.y);
   const Eigen::Vector2d & last_position = this->last_ground_truth_position_.value();
 
   Line2d robot_path = std::make_pair(last_position, current_position);
+
+  // Check intersection with each finish tape
   for (const auto & tape : this->finish_tapes_) {
     if (this->is_intersectant(robot_path, tape)) {
       rclcpp::Time current_time(ground_truth_msg->header.stamp);
