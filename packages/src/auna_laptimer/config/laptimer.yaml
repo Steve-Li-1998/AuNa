@@ -1,0 +1,9 @@
+robot1:
+  laptimer_node:
+    ros__parameters:
+      # Controller parameters
+      finish_tapes: [0.0, -1.0, 0.0, 1.0]  # x1, y1, x2, y2 coordinates of finish line tapes
+
+      # Topic names
+      ground_truth_topic: "gazebo_pose"
+      get_lap_records_service_name: "get_lap_records"
