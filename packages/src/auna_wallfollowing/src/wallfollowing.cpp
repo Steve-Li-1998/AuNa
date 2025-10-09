@@ -1,5 +1,7 @@
 #include "auna_wallfollowing/wallfollowing.hpp"
 
+#include <rclcpp/logging.hpp>
+
 #include <iostream>
 
 using namespace std;
@@ -12,8 +14,7 @@ WallFollow::WallFollow() : Node("wallfollowing")
   // Initialize ROS2 interfaces
   scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
     lidarscan_topic_, 10, std::bind(&WallFollow::scan_callback, this, std::placeholders::_1));
-  drive_pub_ =
-    this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(drive_topic_, 10);
+  drive_pub_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(drive_topic_, 10);
   error_pub_ = this->create_publisher<std_msgs::msg::Float64>("error", 10);
 
   RCLCPP_INFO(this->get_logger(), "WallFollow node initialized.");
@@ -45,8 +46,11 @@ void WallFollow::declare_parameters()
 
   // Get parameters
   kp_ = this->get_parameter("kp").as_double();
+  RCLCPP_INFO(this->get_logger(), "Kp: %f", kp_);
   kd_ = this->get_parameter("kd").as_double();
+  RCLCPP_INFO(this->get_logger(), "Kd: %f", kd_);
   ki_ = this->get_parameter("ki").as_double();
+  RCLCPP_INFO(this->get_logger(), "Ki: %f", ki_);
 
   desired_distance_ = this->get_parameter("desired_distance").as_double();
   velocity_ = this->get_parameter("velocity").as_double();
@@ -68,19 +72,20 @@ void WallFollow::declare_parameters()
 }
 
 double WallFollow::get_range(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan, double angle)
-  {
-    if (angle < scan->angle_min || angle > scan->angle_max) return -1.0;
+{
+  if (angle < scan->angle_min || angle > scan->angle_max) return -1.0;
 
-    int index = static_cast<int>(std::round((angle - scan->angle_min) / scan->angle_increment));
-    if (index < 0 || index >= static_cast<int>(scan->ranges.size())) return -1.0;
+  int index = static_cast<int>(std::round((angle - scan->angle_min) / scan->angle_increment));
+  if (index < 0 || index >= static_cast<int>(scan->ranges.size())) return -1.0;
 
-    float dist = scan->ranges[index];
-    if (std::isnan(dist) || std::isinf(dist)) return -1.0;
+  float dist = scan->ranges[index];
+  if (std::isnan(dist) || std::isinf(dist)) return -1.0;
 
-    return static_cast<double>(dist);
-  }
+  return static_cast<double>(dist);
+}
 
-double WallFollow::get_error(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan, double desired_distance)
+double WallFollow::get_error(
+  const sensor_msgs::msg::LaserScan::ConstSharedPtr scan, double desired_distance)
 {
   double a = get_range(scan, angle_a_);
   double b = get_range(scan, angle_b_);
@@ -134,9 +139,9 @@ void WallFollow::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr
   pid_control(error, velocity_);
 }
 
-double WallFollow::radiansToDegree(const double & angleInRadians) 
-{ 
-  return angleInRadians * (180.0 / M_PI); 
+double WallFollow::radiansToDegree(const double & angleInRadians)
+{
+  return angleInRadians * (180.0 / M_PI);
 }
 
 int main(int argc, char ** argv)
