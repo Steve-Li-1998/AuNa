@@ -475,7 +475,7 @@ services:
     environment:
       - ROBOT_INDEX=1
     profiles:
-      ["sim_robot1", "physical_robot1", "sim_scenario", "sim_scenario_1"]
+      ["sim_robot1", "physical_robot1", "sim_scenario"]
 
   wallfollowing_robot2:
     extends: wallfollowing
@@ -560,7 +560,7 @@ services:
       [
         "/bin/bash",
         "-c",
-        "cd packages && colcon build --symlink-install --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && cd .. && /bin/bash",
+        "cd packages && cd .. && /bin/bash",
       ]
     profiles: ["zenohd", "development"]
 
