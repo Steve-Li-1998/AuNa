@@ -28,7 +28,6 @@ GapFollow::GapFollow()
   std::cout << this->get_name() << std::endl;
 
   this->period_ = std::chrono::milliseconds(static_cast<int>(1000.0 / vel_pub_rate_));
-  this->last_scan_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
 
   this->scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
     this->scan_topic_, 1, std::bind(&GapFollow::scan_callback, this, std::placeholders::_1));
@@ -84,44 +83,31 @@ void GapFollow::declare_parameters()
 void GapFollow::scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr scan_msg)
 {
   this->scan_msg_ = scan_msg;
+  this->preprocess_scan(*(this->scan_msg_));
+  auto target_gap = this->find_target_gap(this->find_gap(*(this->scan_msg_)));
+  if (target_gap.has_value()) {
+    auto [linear_x, angular_z] = this->compute_velocity(target_gap.value(), *(this->scan_msg_));
+    this->send_vel_cmd(linear_x, angular_z);
+  } else {
+    this->stop_robot();
+    RCLCPP_ERROR(this->get_logger(), "No avaliable destination.");
+  }
 }
 
 void GapFollow::timer_callback()
 {
-  if (!this->scan_msg_) {
-    this->stop_robot();
-    RCLCPP_WARN_STREAM(
-      this->get_logger(),
-      "There is still no message from topic \"" << this->scan_topic_ << "\" cached.");
-    return;
-  }
-  rclcpp::Time t_msg(this->scan_msg_->header.stamp);  // message release time
-  rclcpp::Time t_now = this->get_clock()->now();      // current time
-  if (t_now.seconds() == 0.0) {
+  rclcpp::Time time_now = this->get_clock()->now();  // current time
+  if (time_now.seconds() == 0.0) {
     RCLCPP_WARN(this->get_logger(), "ROS time not initialized yet");
     return;
   }
-  auto delay = t_now - t_msg;
+  rclcpp::Time time_message_released(this->scan_msg_->header.stamp);  // message release time
+  auto message_age = time_now - time_message_released;
 
-  if (delay > rclcpp::Duration(std::chrono::milliseconds(500))) {
+  if (message_age > rclcpp::Duration(std::chrono::milliseconds(500))) {
     // If the scan data is too old, stop the robot
     this->stop_robot();
     RCLCPP_ERROR(this->get_logger(), "The scan data is too old, robot will stop.");
-  } else if (this->last_scan_time_ == t_msg) {
-    // If the scan data is the same as last time, do nothing
-    return;
-  } else {
-    // Process the new scan data
-    this->last_scan_time_ = t_msg;
-    this->preprocess_scan(*(this->scan_msg_));
-    auto target_gap = this->find_target_gap(this->find_gap(*(this->scan_msg_)));
-    if (target_gap.has_value()) {
-      auto [linear_x, angular_z] = this->compute_velocity(target_gap.value(), *(this->scan_msg_));
-      this->send_vel_cmd(linear_x, angular_z);
-    } else {
-      this->stop_robot();
-      RCLCPP_ERROR(this->get_logger(), "No avaliable destination.");
-    }
   }
 }
 

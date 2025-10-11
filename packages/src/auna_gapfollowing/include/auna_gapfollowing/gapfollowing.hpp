@@ -34,7 +34,6 @@ private:
   float max_angular_velocity_;
 
   sensor_msgs::msg::LaserScan::SharedPtr scan_msg_;
-  rclcpp::Time last_scan_time_;
 
   // Topic names
   std::string scan_topic_;
@@ -46,13 +45,22 @@ private:
   rclcpp::TimerBase::SharedPtr timer_;
 
   /**
-   * @brief Callback for laser scan messages
-   * @param scan_msg Laser scan message
+   * @brief Callback for processing incoming LiDAR scan data.
+   *
+   * Stores the latest scan message, preprocesses it, finds the best navigation gap,
+   * and commands robot motion accordingly. If no valid gap is found, the robot stops.
+   *
+   * @param scan_msg Shared pointer to the incoming LaserScan message.
    */
   void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr scan_msg);
 
   /**
-   * @brief Timer callback to publish velocity commands at a fixed rate
+   * @brief Timer callback to check LiDAR scan freshness.
+   *
+   * Stops the robot if the latest scan message is older than 500 ms,
+   * ensuring it doesn't move with outdated sensor data.
+   *
+   * @note Skips execution if ROS time is not yet initialized.
    */
   void timer_callback();
 
